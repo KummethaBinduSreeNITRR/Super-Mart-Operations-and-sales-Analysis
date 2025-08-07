@@ -1,0 +1,113 @@
+To generate the data
+
+
+# STEP 1: Install required libraries
+!pip install pandas openpyxl xlsxwriter
+
+import os
+import pandas as pd
+import random
+from datetime import datetime, timedelta
+
+# STEP 2: Create output directory (if it doesn't exist)
+output_dir = "/mnt/data"
+os.makedirs(output_dir, exist_ok=True)
+
+# STEP 3: Generate Supermarket Data
+
+categories = {
+    "Vegetables": ["Tomato", "Onion", "Potato", "Carrot", "Cabbage", "Cucumber", "Spinach"],
+    "Fruits": ["Apple", "Banana", "Orange", "Papaya", "Grapes", "Mango"],
+    "Dairy": ["Milk", "Curd", "Butter", "Cheese", "Paneer", "Cream"],
+    "Snacks": ["Chips", "Biscuits", "Popcorn", "Chocolate", "Namkeen", "Samosa"],
+    "Beverages": ["Tea", "Coffee", "Juice", "Soft Drink", "Energy Drink"],
+    "Bakery": ["Bread", "Cake", "Puffs", "Buns", "Cookies"],
+    "Personal Care": ["Soap", "Shampoo", "Toothpaste", "Face Wash", "Deodorant"],
+    "Household": ["Detergent", "Dishwash", "Toilet Cleaner", "Phenyl", "Floor Cleaner"],
+    "Grocery": ["Rice", "Sugar", "Salt", "Lentils", "Flour", "Oil", "Spices"],
+    "Frozen": ["Frozen Peas", "Ice Cream", "Frozen French Fries", "Frozen Corn"],
+    "Meat": ["Chicken", "Fish", "Eggs", "Mutton"]
+}
+
+products = []
+for category, items in categories.items():
+    for _ in range(random.randint(7, 12)):
+        name = f"{random.choice(items)} {random.randint(100, 999)}"
+        price = round(random.uniform(20, 300), 2)
+        products.append((name, category, price))
+products_df = pd.DataFrame(products, columns=["product_name", "category", "price"])
+products_df["product_id"] = ["P" + str(i+1).zfill(4) for i in range(len(products_df))]
+products_df = products_df[["product_id", "product_name", "category", "price"]]
+
+customer_ids = ["C" + str(i+1).zfill(5) for i in range(3000)]
+genders = ["Male", "Female", "Other"]
+payment_methods = ["Cash", "Credit Card", "Debit Card", "UPI", "Mobile Wallet"]
+ratings = [1, 2, 3, 4, 5]
+
+sales_rows = []
+for idx, cust_id in enumerate(customer_ids):
+    date = datetime(2024, 1, 1) + timedelta(days=random.randint(0, 200))
+    time_of_purchase = f"{random.randint(9, 21)}:{random.randint(0, 59):02d}"
+    sale_id = f"S{1000 + idx}"
+    purchased_products = random.sample(products_df["product_id"].tolist(), random.randint(2, 6))
+    for prod_id in purchased_products:
+        prod_info = products_df[products_df["product_id"] == prod_id].iloc[0]
+        quantity = random.randint(1, 5)
+        unit_price = prod_info["price"]
+        line_total = round(unit_price * quantity, 2)
+        sales_rows.append({
+            "sale_id": sale_id,
+            "date": date.strftime("%Y-%m-%d"),
+            "time_of_purchase": time_of_purchase,
+            "day_of_week": date.strftime("%A"),
+            "customer_id": cust_id,
+            "gender": random.choice(genders),
+            "payment_type": random.choice(payment_methods),
+            "product_id": prod_id,
+            "category": prod_info["category"],
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "total_line_amount": line_total,
+            "rating": random.choice(ratings)
+        })
+sales_df = pd.DataFrame(sales_rows)
+
+offers = []
+for i in range(100):
+    prod = products_df.sample(1).iloc[0]
+    discount = round(random.uniform(5, 25), 2)
+    start_date = datetime(2024, 1, 1) + timedelta(days=random.randint(0, 150))
+    end_date = start_date + timedelta(days=random.randint(5, 30))
+    offers.append({
+        "offer_id": "O" + str(i+1).zfill(3),
+        "product_id": prod["product_id"],
+        "discount_percent": discount,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d")
+    })
+offers_df = pd.DataFrame(offers)
+
+inventory_rows = []
+for _, row in products_df.iterrows():
+    stock = random.randint(20, 500)
+    reorder_level = random.randint(10, 50)
+    inventory_rows.append({
+        "product_id": row["product_id"],
+        "stock_quantity": stock,
+        "reorder_level": reorder_level
+    })
+inventory_df = pd.DataFrame(inventory_rows)
+
+# STEP 4: Save to Excel
+from pandas import ExcelWriter
+
+file_path = os.path.join(output_dir, "Supermarket_DataOnly.xlsx")
+with ExcelWriter(file_path, engine="openpyxl") as writer:
+    products_df.to_excel(writer, sheet_name="products", index=False)
+    sales_df.to_excel(writer, sheet_name="sales", index=False)
+    offers_df.to_excel(writer, sheet_name="offers", index=False)
+    inventory_df.to_excel(writer, sheet_name="inventory", index=False)
+
+# STEP 5: Download the Excel file
+from google.colab import files
+files.download(file_path)
