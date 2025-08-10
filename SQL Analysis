@@ -1,0 +1,129 @@
+-- 1. Total Sales Overview
+SELECT 
+    SUM(quantity * price) AS total_sales,
+    COUNT(DISTINCT customer_id) AS total_customers,
+    COUNT(DISTINCT product_id) AS total_products
+FROM sales
+JOIN products USING(product_id);
+
+-- 2. Monthly Sales Trend
+SELECT 
+    DATE_FORMAT(sale_date, '%Y-%m') AS month,
+    SUM(quantity * price) AS monthly_sales
+FROM sales
+JOIN products USING(product_id)
+GROUP BY month
+ORDER BY month;
+
+-- 3. Top 10 Best-Selling Products
+SELECT 
+    p.product_name,
+    SUM(s.quantity) AS total_units_sold,
+    SUM(s.quantity * p.price) AS total_revenue
+FROM sales s
+JOIN products p ON s.product_id = p.product_id
+GROUP BY p.product_id
+ORDER BY total_units_sold DESC
+LIMIT 10;
+
+-- 4. Sales by Product Category
+SELECT 
+    category,
+    SUM(quantity * price) AS category_sales,
+    ROUND(100 * SUM(quantity * price) / 
+          (SELECT SUM(quantity * price) FROM sales JOIN products USING(product_id)), 2) AS sales_percentage
+FROM sales
+JOIN products USING(product_id)
+GROUP BY category
+ORDER BY category_sales DESC;
+
+-- 5. Customer Purchase Frequency
+SELECT 
+    customer_id,
+    COUNT(sale_id) AS purchase_count,
+    SUM(quantity * price) AS total_spent
+FROM sales
+JOIN products USING(product_id)
+GROUP BY customer_id
+ORDER BY purchase_count DESC;
+
+-- 6. High-Value Customers (Top 5%)
+SELECT *
+FROM (
+    SELECT 
+        customer_id,
+        SUM(quantity * price) AS total_spent,
+        NTILE(20) OVER (ORDER BY SUM(quantity * price) DESC) AS spending_percentile
+    FROM sales
+    JOIN products USING(product_id)
+    GROUP BY customer_id
+) t
+WHERE spending_percentile = 1
+ORDER BY total_spent DESC;
+
+-- 7. Seasonal Demand Analysis
+SELECT 
+    MONTHNAME(sale_date) AS month,
+    category,
+    SUM(quantity) AS total_units_sold
+FROM sales
+JOIN products USING(product_id)
+GROUP BY month, category
+ORDER BY FIELD(month, 'January','February','March','April','May','June',
+                         'July','August','September','October','November','December');
+
+-- 8. Payment Method Popularity
+SELECT 
+    payment_method,
+    COUNT(*) AS transaction_count,
+    SUM(quantity * price) AS total_sales
+FROM sales
+JOIN products USING(product_id)
+GROUP BY payment_method
+ORDER BY transaction_count DESC;
+
+-- 9. Low-Performing Products
+SELECT 
+    product_name,
+    SUM(quantity) AS total_units_sold
+FROM sales
+JOIN products USING(product_id)
+GROUP BY product_id
+HAVING total_units_sold < (
+    SELECT AVG(qty) 
+    FROM (
+        SELECT SUM(quantity) AS qty 
+        FROM sales GROUP BY product_id
+    ) AS sub
+)
+ORDER BY total_units_sold ASC;
+
+-- 10. Year-over-Year Growth
+SELECT 
+    YEAR(sale_date) AS year,
+    SUM(quantity * price) AS total_sales,
+    LAG(SUM(quantity * price)) OVER (ORDER BY YEAR(sale_date)) AS previous_year_sales,
+    ROUND(
+        (SUM(quantity * price) - LAG(SUM(quantity * price)) OVER (ORDER BY YEAR(sale_date))) /
+        LAG(SUM(quantity * price)) OVER (ORDER BY YEAR(sale_date)) * 100, 2
+    ) AS growth_percentage
+FROM sales
+JOIN products USING(product_id)
+GROUP BY year;
+
+-- 11. Products Bought Together (Market Basket Analysis)
+SELECT 
+    s1.product_id AS product_A,
+    p1.product_name AS product_A_name,
+    s2.product_id AS product_B,
+    p2.product_name AS product_B_name,
+    COUNT(*) AS times_bought_together
+FROM sales s1
+JOIN sales s2 
+    ON s1.sale_id = s2.sale_id 
+    AND s1.product_id < s2.product_id
+JOIN products p1 ON s1.product_id = p1.product_id
+JOIN products p2 ON s2.product_id = p2.product_id
+GROUP BY product_A, product_B
+ORDER BY times_bought_together DESC
+LIMIT 10;
